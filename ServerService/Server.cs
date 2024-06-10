@@ -244,7 +244,7 @@ namespace ServerService
             // Создаем файл и получаем данные
             using (FileStream fileStream = File.Create(filePath))
             {
-                byte[] buffer = new byte[8192];
+                byte[] buffer = new byte[32768];
                 long bytesReceived = 0;
                 int bytesRead;
 
@@ -389,7 +389,7 @@ namespace ServerService
             // Открываем и отправляем файл
             using (FileStream fileStream = new FileStream(filePathServer, FileMode.Open, FileAccess.Read))
             {
-                byte[] buffer = new byte[8192];
+                byte[] buffer = new byte[32768];
                 int bytesRead;
 
                 while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)

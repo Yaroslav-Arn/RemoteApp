@@ -73,52 +73,60 @@ namespace RemoteApp
         /// <returns></returns>
         private async Task ReceiveMessageAsync()
         {
-            byte[] typeBytes = new byte[sizeof(int)];
-            int bytesRead;
-            SendDirectoryDrive();
-
-            while (true)
+            try
             {
-                try
-                {
-                    bytesRead = await stream.ReadAsync(typeBytes, 0, typeBytes.Length);
-                }
-                catch
-                {
-                    break;
-                }
 
-                if (bytesRead == 0)
+                byte[] typeBytes = new byte[sizeof(int)];
+                int bytesRead;
+                SendDirectoryDrive();
+
+                while (true)
                 {
-                    break;
+                    try
+                    {
+                        bytesRead = await stream.ReadAsync(typeBytes, 0, typeBytes.Length);
+                    }
+                    catch
+                    {
+                        break;
+                    }
+
+                    if (bytesRead == 0)
+                    {
+                        break;
+                    }
+                    DataType dataType = (DataType)BitConverter.ToInt32(typeBytes, 0);
+
+                    if (dataType == DataType.FilePath)
+                    {
+                        await ReceiveFileAsync();
+
+                    }
+                    else if (dataType == DataType.Command)
+                    {
+
+                        byte[] commandLengthBytes = await ReceiveDataAsync(sizeof(int));
+                        int commandLength = BitConverter.ToInt32(commandLengthBytes, 0);
+
+                        byte[] commandBytes = await ReceiveDataAsync(commandLength);
+                        string command = Encoding.UTF8.GetString(commandBytes);
+
+                        ServerConsoleTextBox.AppendText(command + Environment.NewLine);
+                    }
+                    else if (dataType == DataType.DirectoryDrive)
+                    {
+                        await ReceiveDrivesAsync();
+                    }
+                    else if (dataType == DataType.DirectoryFolder)
+                    {
+                        await ReceiveDirectoryAsync();
+                    }
+
                 }
-                DataType dataType = (DataType)BitConverter.ToInt32(typeBytes, 0);
-
-                if (dataType == DataType.FilePath)
-                {
-                    await ReceiveFileAsync();
-
-                }
-                else if (dataType == DataType.Command)
-                {
-
-                    byte[] commandLengthBytes = await ReceiveDataAsync(sizeof(int));
-                    int commandLength = BitConverter.ToInt32(commandLengthBytes, 0);
-
-                    byte[] commandBytes = await ReceiveDataAsync(commandLength);
-                    string command = Encoding.UTF8.GetString(commandBytes);
-
-                    ServerConsoleTextBox.AppendText(command + Environment.NewLine);
-                }
-                else if (dataType == DataType.DirectoryDrive)
-                {
-                    await ReceiveDrivesAsync();
-                }
-                else if (dataType == DataType.DirectoryFolder)
-                {
-                    await ReceiveDirectoryAsync();
-                }
-
+            }
+            catch 
+            {
+                MessageBox.Show("Сервер разорвал соединение");
             }
         }
 
@@ -158,14 +166,21 @@ namespace RemoteApp
         /// <param name="path"> Путь по которому нужны данные</param>
         public async void SendDirectoryFolder(string path)
         {
-            byte[] typeBytes = BitConverter.GetBytes((int)DataType.DirectoryFolder);
-            await stream.WriteAsync(typeBytes, 0, typeBytes.Length);
+            try
+            {
+                byte[] typeBytes = BitConverter.GetBytes((int)DataType.DirectoryFolder);
+                await stream.WriteAsync(typeBytes, 0, typeBytes.Length);
 
-            byte[] pathBytes = Encoding.UTF8.GetBytes(path);
-            byte[] lengthBytes = BitConverter.GetBytes(pathBytes.Length);
+                byte[] pathBytes = Encoding.UTF8.GetBytes(path);
+                byte[] lengthBytes = BitConverter.GetBytes(pathBytes.Length);
 
-            await stream.WriteAsync(lengthBytes, 0, lengthBytes.Length);
-            await stream.WriteAsync(pathBytes, 0, pathBytes.Length);
+                await stream.WriteAsync(lengthBytes, 0, lengthBytes.Length);
+                await stream.WriteAsync(pathBytes, 0, pathBytes.Length);
+            }
+            catch
+            {
+                MessageBox.Show("Сервер разорвал соединение");
+            }
         }
 
         /// <summary>
@@ -176,32 +191,39 @@ namespace RemoteApp
         /// <returns></returns>
         public async Task SendFileAsync(string filePathClient, string filePathServer)
         {
-            string fileName = Path.GetFileName(filePathClient);
-            string filePath = Path.Combine(filePathServer, fileName);
-
-            byte[] typeBytes = BitConverter.GetBytes((int)DataType.FilePath);
-            await stream.WriteAsync(typeBytes, 0, typeBytes.Length);
-
-            byte[] pathBytes = Encoding.UTF8.GetBytes(filePath);
-            await stream.WriteAsync(BitConverter.GetBytes(pathBytes.Length), 0, sizeof(int)); 
-            await stream.WriteAsync(pathBytes, 0, pathBytes.Length); 
-
-            long fileLength = new FileInfo(filePathClient).Length;
-
-            byte[] lengthBytes = BitConverter.GetBytes(fileLength);
-            await stream.WriteAsync(lengthBytes, 0, lengthBytes.Length);
-
-            using (FileStream fileStream = new FileStream(filePathClient, FileMode.Open, FileAccess.Read))
+            try
             {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
+                string fileName = Path.GetFileName(filePathClient);
+                string filePath = Path.Combine(filePathServer, fileName);
 
-                while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                byte[] typeBytes = BitConverter.GetBytes((int)DataType.FilePath);
+                await stream.WriteAsync(typeBytes, 0, typeBytes.Length);
+
+                byte[] pathBytes = Encoding.UTF8.GetBytes(filePath);
+                await stream.WriteAsync(BitConverter.GetBytes(pathBytes.Length), 0, sizeof(int));
+                await stream.WriteAsync(pathBytes, 0, pathBytes.Length);
+
+                long fileLength = new FileInfo(filePathClient).Length;
+
+                byte[] lengthBytes = BitConverter.GetBytes(fileLength);
+                await stream.WriteAsync(lengthBytes, 0, lengthBytes.Length);
+
+                using (FileStream fileStream = new FileStream(filePathClient, FileMode.Open, FileAccess.Read))
                 {
-                    await stream.WriteAsync(buffer, 0, bytesRead);
+                    byte[] buffer = new byte[32768];
+                    int bytesRead;
+
+                    while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        await stream.WriteAsync(buffer, 0, bytesRead);
+                    }
                 }
             }
-        }
+            catch
+            {
+                MessageBox.Show("Сервер разорвал соединение");
+            }
+}
         
         /// <summary>
         /// Отправк запроса на получение файла
@@ -210,16 +232,24 @@ namespace RemoteApp
         /// <param name="filePathServer"> Путь где находится файл на стороне сервера</param>
         public async void SendReceiveFile(string filePathClient, string filePathServer)
         {
-            byte[] typeBytes = BitConverter.GetBytes((int)DataType.ReceiveFile);
-            await stream.WriteAsync(typeBytes, 0, typeBytes.Length);
+            try
+            {
 
-            byte[] pathBytes = Encoding.UTF8.GetBytes(filePathClient);
-            await stream.WriteAsync(BitConverter.GetBytes(pathBytes.Length), 0, sizeof(int)); 
-            await stream.WriteAsync(pathBytes, 0, pathBytes.Length); 
+                byte[] typeBytes = BitConverter.GetBytes((int)DataType.ReceiveFile);
+                await stream.WriteAsync(typeBytes, 0, typeBytes.Length);
 
-            pathBytes = Encoding.UTF8.GetBytes(filePathServer);
-            await stream.WriteAsync(BitConverter.GetBytes(pathBytes.Length), 0, sizeof(int)); 
-            await stream.WriteAsync(pathBytes, 0, pathBytes.Length); 
+                byte[] pathBytes = Encoding.UTF8.GetBytes(filePathClient);
+                await stream.WriteAsync(BitConverter.GetBytes(pathBytes.Length), 0, sizeof(int));
+                await stream.WriteAsync(pathBytes, 0, pathBytes.Length);
+
+                pathBytes = Encoding.UTF8.GetBytes(filePathServer);
+                await stream.WriteAsync(BitConverter.GetBytes(pathBytes.Length), 0, sizeof(int));
+                await stream.WriteAsync(pathBytes, 0, pathBytes.Length);
+            }
+            catch
+            {
+                MessageBox.Show("Сервер разорвал соединение");
+            }
         }
 
         /// <summary>
@@ -230,6 +260,7 @@ namespace RemoteApp
         /// <exception cref="IOException"></exception>
         private async Task<byte[]> ReceiveDataAsync(int bytesToRead)
         {
+
             byte[] data = new byte[bytesToRead];
             int bytesRead = 0;
             int totalBytesRead = 0;
@@ -253,14 +284,22 @@ namespace RemoteApp
         /// <returns></returns>
         private async Task ReceiveDrivesAsync()
         {
-            byte[] lengthBytes = await ReceiveDataAsync(sizeof(int));
-            int dataLength = BitConverter.ToInt32(lengthBytes, 0);
+            try
+            {
 
-            byte[] data = await ReceiveDataAsync(dataLength);
-            string serializedData = Encoding.UTF8.GetString(data);
+                byte[] lengthBytes = await ReceiveDataAsync(sizeof(int));
+                int dataLength = BitConverter.ToInt32(lengthBytes, 0);
 
-            fileView.LoadSeverDrive(serializedData);
+                byte[] data = await ReceiveDataAsync(dataLength);
+                string serializedData = Encoding.UTF8.GetString(data);
 
+                fileView.LoadSeverDrive(serializedData);
+            }
+            catch
+            {
+                MessageBox.Show("Сервер разорвал соединение");
+            }
+            
         }
         
         /// <summary>
@@ -269,13 +308,20 @@ namespace RemoteApp
         /// <returns></returns>
         private async Task ReceiveDirectoryAsync()
         {
-            byte[] lengthBytes = await ReceiveDataAsync(sizeof(int));
-            int dataLength = BitConverter.ToInt32(lengthBytes, 0);
+            try
+            {
+                byte[] lengthBytes = await ReceiveDataAsync(sizeof(int));
+                int dataLength = BitConverter.ToInt32(lengthBytes, 0);
 
-            byte[] data = await ReceiveDataAsync(dataLength);
-            string serializedData = Encoding.UTF8.GetString(data);
+                byte[] data = await ReceiveDataAsync(dataLength);
+                string serializedData = Encoding.UTF8.GetString(data);
 
-            fileView.LoadServerFiles(serializedData);
+                fileView.LoadServerFiles(serializedData);
+            }
+            catch
+            {
+                MessageBox.Show("Сервер разорвал соединение");
+            }
         }
 
 
@@ -285,27 +331,35 @@ namespace RemoteApp
         /// <returns></returns>
         private async Task ReceiveFileAsync()
         {
-            byte[] pathLengthBytes = await ReceiveDataAsync(sizeof(int));
-            int pathLength = BitConverter.ToInt32(pathLengthBytes, 0);
-
-            byte[] pathBytes = await ReceiveDataAsync(pathLength);
-            string filePath = Encoding.UTF8.GetString(pathBytes);
-
-            byte[] lengthBytes = await ReceiveDataAsync(sizeof(long));
-            long fileLength = BitConverter.ToInt64(lengthBytes, 0);
-
-            using (FileStream fileStream = File.Create(filePath))
+            try
             {
-                byte[] buffer = new byte[8192];
-                long bytesReceived = 0;
-                int bytesRead;
 
-                while (bytesReceived < fileLength &&
-                       (bytesRead = await stream.ReadAsync(buffer, 0, (int)Math.Min(buffer.Length, fileLength - bytesReceived))) > 0)
+                byte[] pathLengthBytes = await ReceiveDataAsync(sizeof(int));
+                int pathLength = BitConverter.ToInt32(pathLengthBytes, 0);
+
+                byte[] pathBytes = await ReceiveDataAsync(pathLength);
+                string filePath = Encoding.UTF8.GetString(pathBytes);
+
+                byte[] lengthBytes = await ReceiveDataAsync(sizeof(long));
+                long fileLength = BitConverter.ToInt64(lengthBytes, 0);
+
+                using (FileStream fileStream = File.Create(filePath))
                 {
-                    fileStream.Write(buffer, 0, bytesRead);
-                    bytesReceived += bytesRead;
+                    byte[] buffer = new byte[32768];
+                    long bytesReceived = 0;
+                    int bytesRead;
+
+                    while (bytesReceived < fileLength &&
+                           (bytesRead = await stream.ReadAsync(buffer, 0, (int)Math.Min(buffer.Length, fileLength - bytesReceived))) > 0)
+                    {
+                        fileStream.Write(buffer, 0, bytesRead);
+                        bytesReceived += bytesRead;
+                    }
                 }
+            }
+            catch 
+            {
+                MessageBox.Show("Сервер разорвал соединение");
             }
         }
 

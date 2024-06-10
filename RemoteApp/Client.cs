@@ -302,7 +302,7 @@ namespace RemoteApp
         /// <param name="e"></param>
         private void ReceiveButton_Click(object sender, EventArgs e)
         {
-           tcpSocket.SendReceiveFile(filePathClient, filePathServer);
+           tcpSocket.SendReceiveFile(ClientLabel.Text, ServerLabel.Text);
         }
 
         /// <summary>
@@ -314,7 +314,7 @@ namespace RemoteApp
         {
             if(Ip == IpTextBox.Text.Trim())
             {
-                MessageBox.Show("Пока есть подключение по данному Ip удалитьне получится", "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Пока есть подключение по данному Ip удалить не получится", "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             iniFile.DeleteIp(IpTextBox.Text.Trim());

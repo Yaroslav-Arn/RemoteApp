@@ -55,7 +55,7 @@ namespace RemoteApp
             }
             catch (UnauthorizedAccessException)
             {
-                MessageBox.Show("Access to this directory is denied.");
+                MessageBox.Show("Доступ к этому каталогу запрещен.");
             }
         }
 
@@ -128,7 +128,7 @@ namespace RemoteApp
             }
         }
          /// <summary>
-         /// /Загрузка папок и файлов сервеар
+         /// Загрузка папок и файлов сервера
          /// </summary>
          /// <param name="serializedData">Данные от сервера</param>
         public void LoadServerFiles(string serializedData)
@@ -143,18 +143,19 @@ namespace RemoteApp
                 {
                     foreach (string item in kvp.Value)
                     {
-                        if (Directory.Exists(item))
-                        {
-                            TreeNode directoryNode = new TreeNode((item));
-                            directoryNode.Tag = item;
-                            directoryNode.Nodes.Add("*"); 
-                            driveNode.Nodes.Add(directoryNode);
-                        }
-                        else if (File.Exists(item))
+                        if (File.Exists(item))
                         {
                             TreeNode fileNode = new TreeNode((item));
                             fileNode.Tag = item;
                             driveNode.Nodes.Add(fileNode);
+                        }
+                        else
+                        {
+                            TreeNode directoryNode = new TreeNode((item));
+                            directoryNode.Tag = item;
+                            directoryNode.Nodes.Add("*");
+                            driveNode.Nodes.Add(directoryNode);
+
                         }
                     }
                 }

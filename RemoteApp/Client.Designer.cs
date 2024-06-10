@@ -167,6 +167,7 @@
             this.ServerConsoleTextBox.Location = new System.Drawing.Point(10, 108);
             this.ServerConsoleTextBox.Multiline = true;
             this.ServerConsoleTextBox.Name = "ServerConsoleTextBox";
+            this.ServerConsoleTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this.ServerConsoleTextBox.Size = new System.Drawing.Size(380, 204);
             this.ServerConsoleTextBox.TabIndex = 13;
             // 
@@ -218,7 +219,6 @@
             this.Controls.Add(this.ServerView);
             this.Controls.Add(this.ClientView);
             this.Name = "Client";
-            this.Text = "Form1";
             this.ResumeLayout(false);
             this.PerformLayout();
 
